@@ -1,80 +1,146 @@
 import { useState, useCallback } from 'react';
 import Header from './components/Header';
-import LandingPage from './components/LandingPage';
-import BasicInfoForm from './components/BasicInfoForm';
-import DocumentUpload from './components/DocumentUpload';
-import ProcessingScreen from './components/ProcessingScreen';
-import CreditMemo from './components/CreditMemo';
-import ChatWidget from './components/ChatWidget';
-import { generateCreditMemo, type LoanApplication, type CreditMemoData } from './utils/memoGenerator';
-
-type Step = 'landing' | 'basic-info' | 'documents' | 'processing' | 'memo';
+import Welcome from './components/Welcome';
+import PersonalDetails from './components/PersonalDetails';
+import IdentityVerification from './components/IdentityVerification';
+import AddressDetails from './components/AddressDetails';
+import EmploymentDetails from './components/EmploymentDetails';
+import CardSelection from './components/CardSelection';
+import ReviewSubmit from './components/ReviewSubmit';
+import Success from './components/Success';
+import type {
+  Step,
+  PersonalDetails as PersonalDetailsType,
+  IdentityDetails,
+  AddressDetails as AddressDetailsType,
+  EmploymentDetails as EmploymentDetailsType,
+  CardSelection as CardSelectionType,
+  ApplicationData,
+} from './types';
+import {
+  initialPersonalDetails,
+  initialIdentityDetails,
+  initialAddressDetails,
+  initialEmploymentDetails,
+  initialCardSelection,
+  STEP_ORDER,
+} from './types';
 
 export default function App() {
-  const [step, setStep] = useState<Step>('landing');
-  const [application, setApplication] = useState<LoanApplication | null>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, { name: string; size: number }[]>>({});
-  const [creditMemo, setCreditMemo] = useState<CreditMemoData | null>(null);
+  const [step, setStep] = useState<Step>('welcome');
+  const [personal, setPersonal] = useState<PersonalDetailsType>(initialPersonalDetails);
+  const [identity, setIdentity] = useState<IdentityDetails>(initialIdentityDetails);
+  const [address, setAddress] = useState<AddressDetailsType>(initialAddressDetails);
+  const [employment, setEmployment] = useState<EmploymentDetailsType>(initialEmploymentDetails);
+  const [card, setCard] = useState<CardSelectionType>(initialCardSelection);
 
-  const handleBasicInfoSubmit = (data: LoanApplication) => {
-    setApplication(data);
-    setStep('documents');
-  };
-
-  const handleDocumentsSubmit = (files: Record<string, { name: string; size: number }[]>) => {
-    setUploadedFiles(files);
-    setStep('processing');
-  };
-
-  const handleProcessingComplete = useCallback(() => {
-    if (application) {
-      const memo = generateCreditMemo({ ...application, uploadedFiles });
-      setCreditMemo(memo);
-      setStep('memo');
+  const goBack = useCallback(() => {
+    const currentIndex = STEP_ORDER.indexOf(step);
+    if (currentIndex > 0) {
+      setStep(STEP_ORDER[currentIndex - 1]);
     }
-  }, [application, uploadedFiles]);
+  }, [step]);
+
+  const handlePersonalNext = (data: PersonalDetailsType) => {
+    setPersonal(data);
+    setStep('identity');
+  };
+
+  const handleIdentityNext = (data: IdentityDetails) => {
+    setIdentity(data);
+    setStep('address');
+  };
+
+  const handleAddressNext = (data: AddressDetailsType) => {
+    setAddress(data);
+    setStep('employment');
+  };
+
+  const handleEmploymentNext = (data: EmploymentDetailsType) => {
+    setEmployment(data);
+    setStep('card');
+  };
+
+  const handleCardNext = (data: CardSelectionType) => {
+    setCard(data);
+    setStep('review');
+  };
+
+  const handleEdit = (targetStep: Step) => {
+    setStep(targetStep);
+  };
+
+  const handleSubmit = () => {
+    setStep('success');
+  };
 
   const handleNewApplication = () => {
-    setStep('landing');
-    setApplication(null);
-    setUploadedFiles({});
-    setCreditMemo(null);
+    setStep('welcome');
+    setPersonal(initialPersonalDetails);
+    setIdentity(initialIdentityDetails);
+    setAddress(initialAddressDetails);
+    setEmployment(initialEmploymentDetails);
+    setCard(initialCardSelection);
   };
 
-  const stepNum = step === 'basic-info' ? 1 : step === 'documents' ? 2 : step === 'processing' ? 3 : step === 'memo' ? 4 : undefined;
+  const applicationData: ApplicationData = {
+    personal,
+    identity,
+    address,
+    employment,
+    card,
+  };
+
+  const showBack = step !== 'welcome' && step !== 'success' && step !== 'personal';
 
   return (
-    <div className="min-h-screen bg-nepal-dark">
-      {step !== 'landing' && step !== 'processing' && (
-        <Header step={stepNum} totalSteps={4} />
+    <div className="min-h-screen bg-gray-50">
+      <Header
+        currentStep={step}
+        onBack={showBack ? goBack : undefined}
+      />
+
+      {step === 'welcome' && (
+        <Welcome onStart={() => setStep('personal')} />
       )}
-      {step === 'landing' && (
-        <>
-          <Header />
-          <LandingPage onStart={() => setStep('basic-info')} />
-        </>
+
+      {step === 'personal' && (
+        <PersonalDetails data={personal} onNext={handlePersonalNext} />
       )}
-      {step === 'basic-info' && (
-        <BasicInfoForm onSubmit={handleBasicInfoSubmit} />
+
+      {step === 'identity' && (
+        <IdentityVerification data={identity} onNext={handleIdentityNext} />
       )}
-      {step === 'documents' && application && (
-        <DocumentUpload
-          application={application}
-          onBack={() => setStep('basic-info')}
-          onSubmit={handleDocumentsSubmit}
+
+      {step === 'address' && (
+        <AddressDetails data={address} onNext={handleAddressNext} />
+      )}
+
+      {step === 'employment' && (
+        <EmploymentDetails data={employment} onNext={handleEmploymentNext} />
+      )}
+
+      {step === 'card' && (
+        <CardSelection
+          data={card}
+          monthlySalary={employment.monthlySalary}
+          onNext={handleCardNext}
         />
       )}
-      {step === 'processing' && application && (
-        <ProcessingScreen
-          borrowerName={application.borrowerName}
-          onComplete={handleProcessingComplete}
+
+      {step === 'review' && (
+        <ReviewSubmit
+          data={applicationData}
+          onEdit={handleEdit}
+          onSubmit={handleSubmit}
         />
       )}
-      {step === 'memo' && creditMemo && (
-        <>
-          <CreditMemo memo={creditMemo} onNewApplication={handleNewApplication} />
-          <ChatWidget memo={creditMemo} />
-        </>
+
+      {step === 'success' && (
+        <Success
+          data={applicationData}
+          onNewApplication={handleNewApplication}
+        />
       )}
     </div>
   );
